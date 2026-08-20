@@ -1,0 +1,40 @@
+name: Android unit tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # This repo doesn't commit a Gradle wrapper (it's a Capacitor plugin *module*, not a
+      # standalone app - see android/settings.gradle's comment). setup-gradle can provision
+      # Gradle itself instead of relying on ./gradlew, so we call `gradle` directly below.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13.2'
+
+      - name: Run Android unit tests
+        working-directory: android
+        run: gradle test --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: android/build/reports/tests/
+          retention-days: 14
