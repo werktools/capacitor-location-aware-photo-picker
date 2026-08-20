@@ -1,0 +1,79 @@
+{
+  "name": "capacitor-location-aware-photo-picker",
+  "version": "0.1.0",
+  "description": "Android-only Capacitor plugin that picks photos from the gallery via ACTION_GET_CONTENT and preserves original GPS EXIF data, which the system Photo Picker and @capacitor/camera's chooseFromGallery both redact.",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "unpkg": "dist/plugin.js",
+  "files": [
+    "android/src/main/",
+    "android/build.gradle",
+    "dist/",
+    "!android/build/",
+    "!android/.gradle/",
+    "!android/.kotlin/"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/werktools/capacitor-location-aware-photo-picker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/werktools/capacitor-location-aware-photo-picker/issues"
+  },
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "native",
+    "android",
+    "gallery",
+    "photo-picker",
+    "exif",
+    "gps",
+    "location"
+  ],
+  "scripts": {
+    "verify": "npm run verify:android && npm run verify:web",
+    "verify:android": "cd android && gradle clean build test && cd ..",
+    "verify:web": "npm run build",
+    "test:android": "cd android && gradle test && cd ..",
+    "lint": "npm run eslint && npm run prettier -- --check",
+    "fmt": "npm run eslint -- --fix && npm run prettier -- --write",
+    "eslint": "eslint . --ext ts",
+    "prettier": "prettier \"**/*.{css,html,ts,js,java}\"",
+    "docgen": "docgen --api LocationAwarePhotoPickerPlugin --output-readme README.md --output-json dist/docs.json",
+    "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
+    "clean": "rimraf ./dist",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/docgen": "^0.3.0",
+    "@ionic/eslint-config": "^0.4.0",
+    "@ionic/prettier-config": "^4.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.4.2",
+    "prettier-plugin-java": "^2.6.6",
+    "rimraf": "^6.0.1",
+    "rollup": "^4.28.1",
+    "typescript": "~4.1.5"
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=7.0.0"
+  },
+  "prettier": "@ionic/prettier-config",
+  "eslintConfig": {
+    "extends": "@ionic/eslint-config/recommended"
+  },
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true
+  }
+}

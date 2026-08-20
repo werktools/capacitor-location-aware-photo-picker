@@ -1,0 +1,15 @@
+// Makes this directory a standalone, buildable Gradle project - purely so `android/`'s unit tests
+// can be run in isolation (e.g. `gradle test` from here, or via CI) without needing a full
+// consuming Capacitor app.
+//
+// This module doesn't commit a Gradle wrapper (gradlew/gradlew.bat/gradle-wrapper.jar): as a
+// Capacitor plugin, it's normally built as a library module included by a consuming app's own
+// wrapper, not run standalone. To generate a local wrapper for convenience, run
+// `gradle wrapper --gradle-version 8.13.2` from this directory with a system-installed Gradle -
+// see this repo's README "Testing" section for the full instructions, including for CI.
+//
+// IMPORTANT: android/build.gradle pins Android Gradle Plugin 8.13.0, which requires Gradle 8.13
+// or newer as a hard minimum - an older Gradle (e.g. from a stray system-wide install) will fail
+// with "Could not generate a decorated class for type LibraryPlugin ... BuildFeatures". See the
+// README's Testing > Troubleshooting section if you hit this.
+rootProject.name = 'capacitor-location-aware-photo-picker'

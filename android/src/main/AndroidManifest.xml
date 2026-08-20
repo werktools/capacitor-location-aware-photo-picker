@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        ACCESS_MEDIA_LOCATION is the only permission this plugin needs. Picking itself needs no
+        storage/media permission at all - the Storage Access Framework grants per-URI read access
+        directly through the system picker. This permission is only used, best-effort, to recover
+        GPS EXIF data after a photo is picked (see README for when that's actually possible).
+
+        Declared here rather than left for the consuming app to add, since Android's manifest
+        merger includes uses-permission entries from library modules automatically - no extra setup
+        needed in your app's own AndroidManifest.xml.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION"/>
+</manifest>
