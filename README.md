@@ -135,6 +135,7 @@ const { results } = await LocationAwarePhotoPicker.chooseFromGallery({
 for (const photo of results) {
   console.log(photo.uri, photo.webPath);
   console.log(photo.metadata?.exif?.GPSLatitude, photo.metadata?.exif?.GPSLongitude);
+  console.log(photo.metadata?.creationDate);
 }
 ```
 
@@ -188,6 +189,7 @@ Android only. Rejects with `unimplemented` on iOS and web.
 | **`resolution`** | <code>string</code> | `<width>x<height>` format, e.g. `'1920x1080'`. |
 | **`size`** | <code>string</code> | File size in bytes, as a string. |
 | **`format`** | <code>string</code> | Always `'jpeg'` - see "How it works" below. |
+| **`creationDate`** | <code>string</code> | ISO 8601. From EXIF `DateTimeOriginal`/`DateTime`, with its paired `OffsetTimeOriginal`/`OffsetTime` when the camera recorded one (e.g. `'2026-01-15T22:13:20+01:00'`); otherwise from EXIF alone, timezone-unqualified (no trailing `Z` - local camera time, zone unknown); otherwise from MediaStore's `DATE_TAKEN`/`DATE_MODIFIED` (has a trailing `Z` - genuine UTC). `undefined` if none of the above has a usable value - never a fabricated "time this plugin copied the file" value. |
 | **`exif`** | <code>{ [key: string]: string \| null }</code> | Keyed by EXIF tag name (e.g. `"GPSLatitude"`), values are ExifInterface's raw string form (un-parsed DMS rationals for GPS, etc.). GPS keys are populated only when recovery succeeded. |
 
 #### ChooseFromGalleryOptions
@@ -221,7 +223,35 @@ Android only. Rejects with `unimplemented` on iOS and web.
    EXIF, so the original (non-GPS) EXIF is copied back onto the result immediately afterward.
 4. If `includeMetadata` was set, GPS recovery is attempted (see below) and copied onto the result
    file's EXIF directly - so the returned *file* is correctly self-describing on disk, not just
-   the JSON your JS code receives.
+   the JSON your JS code receives. `creationDate` is also resolved at this point (see "Creation
+   date, specifically" below) and included in the JSON metadata alongside `exif`.
+
+### Creation date, specifically
+
+`metadata.creationDate` is resolved in priority order, all read from the same EXIF pass already
+done for `metadata.exif` (no extra file I/O), with a MediaStore fallback for photos with no usable
+EXIF date at all:
+
+1. **EXIF `DateTimeOriginal`/`DateTime`, combined with its own paired `OffsetTimeOriginal`/
+   `OffsetTime`** (EXIF 2.31+) - when the camera recorded a timezone offset alongside the
+   timestamp, which is increasingly common but still far from universal. `DateTimeOriginal` is only
+   ever paired with `OffsetTimeOriginal`, and `DateTime` only with `OffsetTime` - never mixed, since
+   a photo's capture and last-modified instants could genuinely have been recorded in different
+   timezones (e.g. edited after a flight). EXIF already stores both halves in ISO-8601-compatible
+   form, so combining them is just validated concatenation, not real timezone arithmetic:
+   `'2026:01:15 22:13:20'` + `'+01:00'` -> `'2026-01-15T22:13:20+01:00'`.
+2. **The same EXIF date tag alone**, when present but with no matching offset tag (true for most
+   camera-taken photos even today). This is the camera's local wall-clock time with no timezone
+   attached, so the result has no trailing `Z` or offset - e.g. `'2026-01-15T22:13:20'`. Don't treat
+   the absence of a suffix as "this must be UTC" - it genuinely isn't known.
+3. **MediaStore's `DATE_TAKEN`/`DATE_MODIFIED` columns**, queried on the original picked URI, for
+   photos with no usable EXIF date at all (screenshots, downloaded images, EXIF stripped by another
+   app). These *are* genuine UTC instants, so this path's result does end in `Z` -
+   `'2026-01-15T22:13:20Z'`.
+
+If none of the above has anything usable, `creationDate` is omitted entirely - never a fabricated
+value, and specifically never the local file's own last-modified time, which would just reflect
+when this plugin happened to copy the file, not when the photo was actually taken.
 
 ### GPS recovery, specifically
 

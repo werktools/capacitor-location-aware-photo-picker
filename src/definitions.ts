@@ -90,6 +90,31 @@ export interface MediaMetadata {
   format?: string;
 
   /**
+   * When the photo was created, in ISO 8601 format. Resolved in priority order:
+   *
+   * 1. The photo's own EXIF `DateTimeOriginal`/`DateTime` tag, combined with its *paired*
+   *    `OffsetTimeOriginal`/`OffsetTime` tag (EXIF 2.31+) when the camera recorded one - a growing
+   *    but still not universal share of photos. When available, the string includes that offset,
+   *    e.g. `'2026-01-15T22:13:20+01:00'`.
+   * 2. The same `DateTimeOriginal`/`DateTime` tag alone, when present but with no matching offset
+   *    tag (true for the vast majority of camera-taken photos). This is the camera's local
+   *    wall-clock time with no timezone attached, so the string has **no trailing `Z` or offset** -
+   *    e.g. `'2026-01-15T22:13:20'`. Treat it as "local time, zone unknown", not UTC - don't assume
+   *    the *absence* of an offset means UTC.
+   * 3. MediaStore's own `DATE_TAKEN`/`DATE_MODIFIED` columns, for photos with no usable EXIF date at
+   *    all (screenshots, downloaded images, EXIF stripped by another app). These *are* genuine UTC
+   *    instants, so the string **does** have a trailing `Z` - e.g. `'2026-01-15T22:13:20Z'`.
+   *
+   * In short: check for a trailing `Z` or `±HH:MM` suffix before assuming this string is
+   * timezone-qualified - it might not be, and that's a property of the *source photo's own
+   * metadata*, not something this plugin can improve on.
+   *
+   * `undefined` if none of the above has anything usable - never a fabricated value, and never the
+   * time the photo happened to be picked/copied by this plugin.
+   */
+  creationDate?: string;
+
+  /**
    * EXIF data read from the returned file, as an object keyed by EXIF tag name (matching
    * androidx.exifinterface.media.ExifInterface's `TAG_*` constant values, e.g. `"GPSLatitude"`).
    * Values are the raw string form ExifInterface itself returns - un-parsed DMS rationals for GPS

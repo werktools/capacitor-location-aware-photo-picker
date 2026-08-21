@@ -204,15 +204,88 @@ class LocationAwarePhotoPickerPlugin : Plugin() {
             if (bitmap != null) {
                 metadata.put("resolution", "${bitmap.width}x${bitmap.height}")
                 val exif = ImageUtils.getExifData(context, bitmap, fileUri)
-                metadata.put("exif", exif.toJson())
+                val exifJson = exif.toJson()
+                metadata.put("exif", exifJson)
+                metadata.put("creationDate", resolveCreationDate(pickedUri, exifJson))
             } else {
-                metadata.put("exif", JSObject())
+                val exifJson = JSObject()
+                metadata.put("exif", exifJson)
+                metadata.put("creationDate", resolveCreationDate(pickedUri, exifJson))
             }
 
             ret.put("metadata", metadata)
         }
 
         return ret
+    }
+
+    /**
+     * Resolves the photo's creation date, preferring camera-embedded EXIF over MediaStore's own
+     * columns:
+     *
+     * 1. EXIF `DateTimeOriginal` combined with its paired `OffsetTimeOriginal` (EXIF 2.31+, not
+     *    populated by every camera, but increasingly common) - genuinely timezone-aware, e.g.
+     *    `'2026-01-15T22:13:20+01:00'`. See `DateUtils.exifDateTimeWithOffsetToIso`.
+     * 2. EXIF `DateTimeOriginal` alone, if no matching offset is available - timezone-unqualified,
+     *    e.g. `'2026-01-15T22:13:20'`. See `DateUtils.exifDateTimeToIso` for why.
+     * 3. The same two steps against `DateTime`/`OffsetTime` instead, if `DateTimeOriginal` itself is
+     *    entirely absent. `OffsetTimeOriginal` is deliberately never paired with `DateTime` (or vice
+     *    versa) - a photo's capture and last-modified instants could genuinely have been recorded in
+     *    different timezones (e.g. edited after a flight), so mixing the pairs would risk attaching
+     *    the wrong offset to the wrong instant.
+     * 4. MediaStore's `DATE_TAKEN`/`DATE_MODIFIED` columns, queried on the original picked URI -
+     *    genuine UTC epoch timestamps (millis and seconds respectively), so `Z` is accurate here.
+     *    Used only when EXIF has none of the above - e.g. screenshots, downloaded images, or photos
+     *    whose EXIF was stripped by another app before this one ever saw them.
+     *
+     * All of steps 1-3 read from `exifJson`, already built once in `processUri` from the same file
+     * this function would otherwise have to re-read.
+     *
+     * Returns `null` - not a fabricated value - if none of the above has anything usable. In
+     * particular, this deliberately does *not* fall back to the locally-copied file's own
+     * last-modified time, which would just be "whenever this plugin copied the file" and would
+     * silently misrepresent that as the photo's actual creation date.
+     */
+    private fun resolveCreationDate(pickedUri: Uri, exifJson: JSObject): String? {
+        val dateTimeOriginal = exifJson.optString(ExifInterface.TAG_DATETIME_ORIGINAL, null)
+        if (dateTimeOriginal != null) {
+            val offset = exifJson.optString(ExifInterface.TAG_OFFSET_TIME_ORIGINAL, null)
+            val withOffset = offset?.let { DateUtils.exifDateTimeWithOffsetToIso(dateTimeOriginal, it) }
+            (withOffset ?: DateUtils.exifDateTimeToIso(dateTimeOriginal))?.let { return it }
+        }
+
+        val dateTime = exifJson.optString(ExifInterface.TAG_DATETIME, null)
+        if (dateTime != null) {
+            val offset = exifJson.optString(ExifInterface.TAG_OFFSET_TIME, null)
+            val withOffset = offset?.let { DateUtils.exifDateTimeWithOffsetToIso(dateTime, it) }
+            (withOffset ?: DateUtils.exifDateTimeToIso(dateTime))?.let { return it }
+        }
+
+        return try {
+            context.contentResolver.query(
+                pickedUri,
+                arrayOf(MediaStore.MediaColumns.DATE_TAKEN, MediaStore.MediaColumns.DATE_MODIFIED),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (!cursor.moveToFirst()) return@use null
+
+                val dateTakenIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_TAKEN)
+                val dateTakenMillis = if (dateTakenIndex >= 0) cursor.getLong(dateTakenIndex) else 0L
+                if (dateTakenMillis > 0) return@use DateUtils.epochMillisToUtcIso(dateTakenMillis)
+
+                val dateModifiedIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED)
+                val dateModifiedSeconds = if (dateModifiedIndex >= 0) cursor.getLong(dateModifiedIndex) else 0L
+                if (dateModifiedSeconds > 0) return@use DateUtils.epochMillisToUtcIso(dateModifiedSeconds * 1000)
+
+                null
+            }
+        } catch (_: Exception) {
+            // Best-effort - a missing/unqueryable date should never fail an otherwise successful
+            // photo selection.
+            null
+        }
     }
 
     /**
