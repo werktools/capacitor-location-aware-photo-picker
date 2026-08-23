@@ -46,7 +46,8 @@
     "docgen": "docgen --api LocationAwarePhotoPickerPlugin --output-readme README.md --output-json dist/docs.json",
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
     "clean": "rimraf ./dist",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "prepare": "npm run build"
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.0",
