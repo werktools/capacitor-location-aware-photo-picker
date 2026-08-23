@@ -127,15 +127,22 @@ nearby) coordinates.
 ```typescript
 import { LocationAwarePhotoPicker } from 'capacitor-location-aware-photo-picker';
 
-const { results } = await LocationAwarePhotoPicker.chooseFromGallery({
-  limit: 5,
-  includeMetadata: true,
-});
+try {
+  const { results } = await LocationAwarePhotoPicker.chooseFromGallery({
+    limit: 5,
+    includeMetadata: true,
+  });
 
-for (const photo of results) {
-  console.log(photo.uri, photo.webPath);
-  console.log(photo.metadata?.exif?.GPSLatitude, photo.metadata?.exif?.GPSLongitude);
-  console.log(photo.metadata?.creationDate);
+  for (const photo of results) {
+    console.log(photo.uri, photo.webPath);
+    console.log(photo.metadata?.exif?.GPSLatitude, photo.metadata?.exif?.GPSLongitude);
+    console.log(photo.metadata?.creationDate);
+  }
+} catch (error: any) {
+  if (error.code === 'TOO_MANY_SELECTED') {
+    // The picker itself can't cap selection count - see "Selection limit, specifically" in
+    // this README for why. Prompt the user to select fewer and call chooseFromGallery again.
+  }
 }
 ```
 
@@ -197,7 +204,7 @@ Android only. Rejects with `unimplemented` on iOS and web.
 | Prop | Type | Description | Default |
 | --- | --- | --- | --- |
 | **`allowMultipleSelection`** | <code>boolean</code> | Not applicable - `GetMultipleContents` always presents a multi-select-capable picker (the user can still choose just one). Kept in the type for forward compatibility. Use `limit` to constrain results either way. | <code>false</code> |
-| **`limit`** | <code>number</code> | Maximum number of photos to return. `0` means no limit. | <code>0</code> |
+| **`limit`** | <code>number</code> | Maximum number of photos the user may select. `0` means no limit. Enforced by rejecting the call with `TOO_MANY_SELECTED` if exceeded, not by silently discarding extras or capping the picker's own UI - see "How it works" below for why. | <code>0</code> |
 | **`quality`** | <code>number</code> | JPEG quality, 0-100. | <code>100</code> |
 | **`targetWidth`** | <code>number</code> | Max width in pixels, aspect ratio preserved. `0` means no constraint. | <code>0</code> |
 | **`targetHeight`** | <code>number</code> | Max height in pixels, aspect ratio preserved. `0` means no constraint. | <code>0</code> |
@@ -225,6 +232,21 @@ Android only. Rejects with `unimplemented` on iOS and web.
    file's EXIF directly - so the returned *file* is correctly self-describing on disk, not just
    the JSON your JS code receives. `creationDate` is also resolved at this point (see "Creation
    date, specifically" below) and included in the JSON metadata alongside `exif`.
+
+### Selection limit, specifically
+
+`limit` cannot be enforced in the picker's own UI. `ACTION_GET_CONTENT` only supports
+`EXTRA_ALLOW_MULTIPLE` - a boolean, single-select-or-unlimited-multi-select - with no accompanying
+"maximum count" extra. The Photo Picker's own multi-select action, `ACTION_PICK_IMAGES`, *does*
+support this via `MediaStore.EXTRA_PICK_IMAGES_MAX` - but switching to it would mean switching back
+to the very mechanism this plugin exists to avoid, since that's the one that strips GPS EXIF.
+
+So `limit` is checked only *after* the picker returns, once the actual selection count is known.
+Rather than silently keeping the first `limit` items and discarding the rest - data loss the caller
+might not notice until a user reports "some of my photos didn't come through" - the whole call
+rejects with code `TOO_MANY_SELECTED`, naming exactly how many were selected and what the limit
+was. Catch this and prompt the user to select fewer and try again; there's no way for this plugin
+to stop them from over-selecting in the first place.
 
 ### Creation date, specifically
 
@@ -410,6 +432,10 @@ enough to trust for that specific question. To verify on your actual target devi
   doesn't apply to video the same way.
 - `allowMultipleSelection` is a no-op here (see the options table above) - kept in the type only
   for forward compatibility.
+- `limit` cannot stop the user from over-selecting in the picker's own UI - `ACTION_GET_CONTENT`
+  has no native "maximum count" mechanism the way the Photo Picker's `ACTION_PICK_IMAGES` does.
+  Over-selection is only detected after the fact, and rejects the whole call rather than silently
+  discarding extras - see "Selection limit, specifically" under "How it works" above.
 - The unit tests, CI workflow, and Gradle setup described above have not been executed end-to-end
   in a real environment while writing them (no Android SDK, Gradle, or network access to resolve
   dependencies were available while building this plugin) - see "Testing" above for how to verify

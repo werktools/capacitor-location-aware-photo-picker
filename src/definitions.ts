@@ -1,13 +1,36 @@
+/**
+ * Every error code `chooseFromGallery` can reject with. See the README's "Error handling" section
+ * for what each one means and, critically, why `error.message` is a developer-facing English
+ * string - not localized, and not meant to be shown to end users directly. Switch on `error.code`
+ * and map to your own translated string instead.
+ *
+ * `UNIMPLEMENTED` is a Capacitor framework-level code (not one this plugin defines itself),
+ * included here for completeness since it's still something `chooseFromGallery`'s promise can
+ * reject with, on platforms other than Android.
+ *
+ * @since 0.2.0
+ */
+export type LocationAwarePhotoPickerErrorCode =
+  | 'NO_SELECTION'
+  | 'TOO_MANY_SELECTED'
+  | 'PROCESS_IMAGE_ERROR'
+  | 'PICKER_UNAVAILABLE'
+  | 'UNIMPLEMENTED';
+
 export interface LocationAwarePhotoPickerPlugin {
   /**
-   * Opens the Android system file picker (Storage Access Framework) to choose one or more photos
-   * from the device's gallery, preserving their original GPS EXIF data where possible.
+   * Opens the Android photo picker (`ACTION_GET_CONTENT`, via AndroidX's `GetMultipleContents`
+   * contract) to choose one or more photos from the device's gallery, preserving their original
+   * GPS EXIF data where possible.
    *
    * Unlike `@capacitor/camera`'s `chooseFromGallery` - which, on Android, goes through the system
-   * Photo Picker or the classic gallery UI, both of which strip GPS/location EXIF data from the
-   * returned photo - this method deliberately uses the Storage Access Framework instead, so that
-   * GPS EXIF can be recovered from the original file after picking. See this plugin's README for a
-   * full explanation of why this trade-off exists and what it costs you in picker UX.
+   * Photo Picker, which strips GPS/location EXIF data from the returned photo - this method
+   * deliberately uses `ACTION_GET_CONTENT` instead, so that GPS EXIF can be recovered. See this
+   * plugin's README for a full explanation of why this trade-off exists and what it costs you in
+   * picker UX.
+   *
+   * Rejects with one of `LocationAwarePhotoPickerErrorCode`'s values on failure - see the README's
+   * "Error handling" section before displaying `error.message` anywhere a user might see it.
    *
    * Android only. Rejects with `UNIMPLEMENTED` on iOS and web.
    *
@@ -28,8 +51,15 @@ export interface ChooseFromGalleryOptions {
   allowMultipleSelection?: boolean;
 
   /**
-   * The maximum number of photos to return. Extra selections beyond this limit are discarded.
-   * `0` means no limit.
+   * The maximum number of photos the user may select. `0` means no limit.
+   *
+   * Enforced *after* the picker returns, not in the picker's own UI: `ACTION_GET_CONTENT` (which
+   * this plugin uses instead of the system Photo Picker, to preserve GPS EXIF - see the README)
+   * has no way to cap selection count natively, unlike the Photo Picker's own
+   * `ACTION_PICK_IMAGES`/`EXTRA_PICK_IMAGES_MAX`. If the user selects more than `limit`, the whole
+   * call rejects with code `TOO_MANY_SELECTED` (rather than silently keeping only the first
+   * `limit` items and discarding the rest) - catch this and prompt the user to select fewer and
+   * try again.
    * @default 0
    */
   limit?: number;

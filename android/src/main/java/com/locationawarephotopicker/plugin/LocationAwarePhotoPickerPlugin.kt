@@ -124,8 +124,24 @@ class LocationAwarePhotoPickerPlugin : Plugin() {
             return
         }
 
+        // ACTION_GET_CONTENT (via GetMultipleContents) has no native way to cap how many items the
+        // user can select in the picker UI itself - unlike the modern Photo Picker's
+        // ACTION_PICK_IMAGES, which supports MediaStore.EXTRA_PICK_IMAGES_MAX for exactly this.
+        // Using that action instead isn't an option: it's the very mechanism this plugin exists to
+        // avoid, since it strips GPS EXIF. So `limit` can only be enforced *after* the picker
+        // returns - and rather than silently discarding whichever items happen to be past the
+        // limit (data loss the caller wouldn't necessarily notice), the whole call is rejected,
+        // telling the caller exactly how many were selected and what the limit was, so they can
+        // ask the user to select fewer and try again.
         val limit = call.getInt("limit") ?: 0
-        val selectedUris = if (limit > 0) uris.take(limit) else uris
+        if (limit > 0 && uris.size > limit) {
+            call.reject(
+                "Selected ${uris.size} photos, but limit is $limit. Please select at most $limit " +
+                    "and try again.",
+                "TOO_MANY_SELECTED"
+            )
+            return
+        }
 
         val quality = call.getInt("quality") ?: JPEG_QUALITY_DEFAULT
         val targetWidth = call.getInt("targetWidth") ?: 0
@@ -134,7 +150,7 @@ class LocationAwarePhotoPickerPlugin : Plugin() {
         val includeMetadata = call.getBoolean("includeMetadata") ?: false
 
         val results = JSArray()
-        for (uri in selectedUris) {
+        for (uri in uris) {
             try {
                 results.put(
                     processUri(uri, quality, targetWidth, targetHeight, correctOrientation, includeMetadata)
