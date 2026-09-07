@@ -98,10 +98,10 @@ repositories {
 }
 
 dependencies {
-    if (System.getenv("CAP_PLUGIN_PUBLISH") == "true" || System.getenv("CAP_PLUGIN_BUILD") == "true") {
-        implementation "com.capacitorjs:core:$capacitorVersion"
-    } else {
+    if (findProject(':capacitor-android') != null) {
         implementation project(':capacitor-android')
+    } else {
+        implementation "com.capacitorjs:core:$capacitorVersion"
     }
     implementation "androidx.exifinterface:exifinterface:$androidxExifInterfaceVersion"
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
