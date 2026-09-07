@@ -43,7 +43,7 @@ buildscript {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
-if (System.getenv("CAP_PLUGIN_PUBLISH") == "true") {
+ if (System.getenv("CAP_PLUGIN_PUBLISH") == "true") {
     apply plugin: 'io.github.gradle-nexus.publish-plugin'
     apply from: file('../scripts/android/publish-root.gradle')
     apply from: file('../scripts/android/publish-module.gradle')
@@ -98,7 +98,7 @@ repositories {
 }
 
 dependencies {
-    if (System.getenv("CAP_PLUGIN_PUBLISH") == "true") {
+    if (System.getenv("CAP_PLUGIN_PUBLISH") == "true" || System.getenv("CAP_PLUGIN_BUILD") == "true") {
         implementation "com.capacitorjs:core:$capacitorVersion"
     } else {
         implementation project(':capacitor-android')
