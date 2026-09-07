@@ -10,6 +10,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      CAP_PLUGIN_PUBLISH: "true"
     steps:
       - uses: actions/checkout@v4
 
